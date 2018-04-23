@@ -1,0 +1,813 @@
+---
+title: "Image-Recognition-and-Retrieval"
+output: html_document
+author: Rajarshi Choudhury
+---
+
+#Read Me:
+
+An application to find clothes you are looking for by just clicking a picture.
+
+
+About the project: This project can be classified into 2 major parts:
+
+
+1. Building a model that can correctly recognize 15 different type of apparels. e.g. Top, Cloak, Suit etc.For this task we utilize different models (more on this below) and choose one that performs the best.
+
+2. Integrating model into a web application that accepts user input as uploaded picture, computes the type of picture and then picks an image from google images to print an image by web-scrapping.
+
+
+Data:
+
+The dataset of 89000 apparels was downloaded from here(http://www.vision.ee.ethz.ch/~lbossard/projects/accv12/index.html). It contains images of various sizes. Therefore before feeding the image into our model it was resized and then reshaped into 50x50x3 units.
+
+Since the dataset has diversed folders, a much more simplified data developed from the site above has also been uploaded here.
+
+We used read.Image() in a loop of length of the images of the data for each category in each folder.
+
+
+Data Preprocessing:
+
+For our dataset, we created an array of all the images combined with their label such that our each row represents one image. All the images are resized and reshaped such that each row represent an array of one image with a dimension of (50)(50)(3).
+
+
+Machine learning models:
+
+We are experimenting with below algorithms to come up with the most accurate model:
+
+Random forest: Random Forests have traditionally been a very effective image classifier. We used the randomForest() function from the randomForest package for the task.
+
+SVM: SVM is an equivalent powerful classification algorithm. The data values were already between 0 and 1, so no specific pre-processing was required.  svm() function from e1071 library was used. tune() was also tuned to find cost and gamma function for improving model accuracy.
+
+Convolution Neural Network: CNNs are the current industry best for any image classification. CNN has been used using the keras library, which calls the tensorflow from python in the backend. 
+
+Multiclass Regression: Any classification problem's solution is incomplete without including this approach. Multiclass nominal regression was performed using multinom() function of the mlogit package. However, we show why using this package is not a good idea.
+
+
+Web App:
+
+Shiny was used for developing the UI, where an user could capture any image and upload it. The user then selects the algorithm he wants to use, and the webapp then retrieves the apparel it was type of, and gives a comparitive image from google images.
+
+
+
+
+#About The Data:
+
+About the data: Dataset consists on apparrel images. The apparels are distinguished into 15 categories, given in folders named 0 to 14. The following are the type of apparels in the dataset, given by the notation: <Folder_Name - 'Type_Of_Apparel'(Number_Of_Images_In_The_Folder)>
+
+0 - 'blouses'(1122)
+1 - 'cloak'(8088)
+2 - 'coat'(11297)
+3 - 'jacket'(10472)
+4 - 'long dress'(9273)
+5 - 'polo/sport shirt'(977)
+6 - 'robe'(7128)
+7 - 'shirt'(1748)
+8 - 'short dress'(5288)
+9 - 'suit'(7388)
+10 - 'sweater'(6515)
+11 - 'jersey/t-shirt'(1784)
+12 - 'undergarment, upper body'(6927)
+13 - 'uniform'(4194)
+14 - 'vest, waistcoat'(938)
+
+Throughout this project we work towards building a pipeline that can correctly recognize an image using different models
+
+Please note:
+
+Before proceeding ahead, make sure you have the dataset downloaded and stored in a folder
+
+
+
+
+#Aim Of The Project:
+
+The aim of this project is to develop a working base code, so that anybody can built over it and develop his/her own image classifier and a similar web app.
+
+
+
+
+#Hardware Limitation:
+
+This project has been developed in a limited processing capability system of 4GB RAM, Intel Core-M Processor and 128 GB HDD. As such, we only use limited data and developthe base code.
+
+Recommended Hardware to develop the project with entire data: 64GB RAM, 16GB GPU
+
+
+
+
+#Data PreProcessing:
+
+This part takes care of loading the data into mememory, handles files with different shapes and prepares a method to read the dataset easily in future.
+
+
+Before proceeding ahead, make sure you have the dataset downloaded and stored in a folder
+
+##Libraries: 
+
+Loading all Libraries required in this analysis:
+
+One of the libraries, EBImage cannot be installed directly using install.packages. Please run the below code (commented here) before loading the library
+
+```{r}
+#source("http://bioconductor.org/biocLite.R")
+#biocLite("EBImage")
+```
+
+The libraries:
+ 
+```{r}
+library(digest)
+library(EBImage)
+library(Rcpp)
+library(keras)
+library(randomForest)
+library(caret)
+library(e1071)
+library(nnet)
+```
+
+
+##Reading Images
+
+Since each folder has different length of images, we will be using different variables for it.
+
+```{r}
+
+files <- list.files(path="C:/Users/Rajarshi/Desktop/Machine Learning/Project/final_data/final_data/0/", pattern=".jpg",all.files=T, full.names=F, no.. = T)  
+
+#What the above line of code does is readthe names of all the files in the given path.
+
+mypic1 <- list() #initiates a list named mypic1
+for (i in 1:120) #only considers the first 120 pictures here. If you want to read all the images, replace 120 with length(files)
+{
+  mypic1[[i]] <- readImage(paste("final_data/final_data/0/",trimws(files[i]), sep="")) #reads the files and adds it to the list
+}
+
+#Some points to note here:
+#1.I am repeating the same file length loop again and again although we it was possible to done in 1. this is because  we had considered all the data, each folder have variable lengths and as such this would be required. This is also true for next  part of code  where i resize and reshape the data.
+#2. The above lines are repeated below for various folders, but the same comment as previous applies to all
+
+
+files2 <- list.files(path="C:/Users/Rajarshi/Desktop/Machine Learning/Project/final_data/final_data/1", pattern=".jpg",all.files=T, full.names=F, no.. = T)  
+
+mypic2 <- list()
+for (i in 1:120)
+{
+  mypic2[[i]] <- readImage(paste("final_data/final_data/1/",trimws(files2[i]), sep=""))
+}
+
+files3 <- list.files(path="C:/Users/Rajarshi/Desktop/Machine Learning/Project/final_data/final_data/2", pattern=".jpg",all.files=T, full.names=F, no.. = T)  
+
+mypic3 <- list()
+for (i in 1:120)
+{
+  mypic3[[i]] <- readImage(paste("final_data/final_data/2/",trimws(files3[i]), sep=""))
+}
+
+files4 <- list.files(path="C:/Users/Rajarshi/Desktop/Machine Learning/Project/final_data/final_data/3", pattern=".jpg",all.files=T, full.names=F, no.. = T)  
+
+mypic4 <- list()
+for (i in 1:120)
+{
+  mypic4[[i]] <- readImage(paste("final_data/final_data/3/",trimws(files4[i]), sep=""))
+}
+
+files5 <- list.files(path="C:/Users/Rajarshi/Desktop/Machine Learning/Project/final_data/final_data/4", pattern=".jpg",all.files=T, full.names=F, no.. = T)  
+
+mypic5 <- list()
+for (i in 1:120)
+{
+  mypic5[[i]] <- readImage(paste("final_data/final_data/4/",trimws(files5[i]), sep=""))
+}
+
+
+
+files6 <- list.files(path="C:/Users/Rajarshi/Desktop/Machine Learning/Project/final_data/final_data/5", pattern=".jpg",all.files=T, full.names=F, no.. = T)  
+
+mypic6 <- list()
+for (i in 1:120)
+{
+  mypic6[[i]] <- readImage(paste("final_data/final_data/5/",trimws(files6[i]), sep=""))
+}
+
+files7 <- list.files(path="C:/Users/Rajarshi/Desktop/Machine Learning/Project/final_data/final_data/6", pattern=".jpg",all.files=T, full.names=F, no.. = T)  
+
+mypic7 <- list()
+for (i in 1:120)
+{
+  mypic7[[i]] <- readImage(paste("final_data/final_data/6/",trimws(files7[i]), sep=""))
+}
+
+
+files8 <- list.files(path="C:/Users/Rajarshi/Desktop/Machine Learning/Project/final_data/final_data/7", pattern=".jpg",all.files=T, full.names=F, no.. = T)  
+
+mypic8 <- list()
+for (i in 1:120)
+{
+  mypic8[[i]] <- readImage(paste("final_data/final_data/7/",trimws(files8[i]), sep=""))
+}
+
+
+files9 <- list.files(path="C:/Users/Rajarshi/Desktop/Machine Learning/Project/final_data/final_data/8", pattern=".jpg",all.files=T, full.names=F, no.. = T)  
+
+mypic9 <- list()
+for (i in 1:120)
+{
+  mypic9[[i]] <- readImage(paste("final_data/final_data/8/",trimws(files9[i]), sep=""))
+}
+
+
+files10 <- list.files(path="C:/Users/Rajarshi/Desktop/Machine Learning/Project/final_data/final_data/9", pattern=".jpg",all.files=T, full.names=F, no.. = T)  
+
+mypic10 <- list()
+for (i in 1:120)
+{
+  mypic10[[i]] <- readImage(paste("final_data/final_data/9/",trimws(files10[i]), sep=""))
+}
+
+files11 <- list.files(path="C:/Users/Rajarshi/Desktop/Machine Learning/Project/final_data/final_data/10", pattern=".jpg",all.files=T, full.names=F, no.. = T) 
+
+mypic11 <- list()
+for (i in 1:120)
+{
+  mypic11[[i]] <- readImage(paste("final_data/final_data/10/",trimws(files11[i]), sep=""))
+}
+
+files12 <- list.files(path="C:/Users/Rajarshi/Desktop/Machine Learning/Project/final_data/final_data/11", pattern=".jpg",all.files=T, full.names=F, no.. = T)  
+
+mypic12 <- list()
+for (i in 1:120)
+{
+  mypic12[[i]] <- readImage(paste("final_data/final_data/11/",trimws(files12[i]), sep=""))
+}
+
+
+files13 <- list.files(path="C:/Users/Rajarshi/Desktop/Machine Learning/Project/final_data/final_data/12", pattern=".jpg",all.files=T, full.names=F, no.. = T)  
+
+mypic13 <- list()
+for (i in 1:120)
+{
+  mypic13[[i]] <- readImage(paste("final_data/final_data/12/",trimws(files13[i]), sep=""))
+}
+
+files14 <- list.files(path="C:/Users/Rajarshi/Desktop/Machine Learning/Project/final_data/final_data/13", pattern=".jpg",all.files=T, full.names=F, no.. = T)  
+
+mypic14 <- list()
+for (i in 1:120)
+{
+  mypic14[[i]] <- readImage(paste("final_data/final_data/13/",trimws(files14[i]), sep=""))
+}
+
+files15 <- list.files(path="C:/Users/Rajarshi/Desktop/Machine Learning/Project/final_data/final_data/14", pattern=".jpg",all.files=T, full.names=F, no.. = T)  
+
+mypic15 <- list()
+for (i in 1:120)
+{
+  mypic15[[i]] <- readImage(paste("final_data/final_data/14/",trimws(files15[i]), sep=""))
+}
+
+
+```
+
+
+
+So once all the images are read it is basically represented into m*n*p matrix, where m and n are pixels, and p designate the depth of the image. We need to convert them into aa single array of lengthy. 
+
+Since each image is of different properties, we also need to resize it into a single row before that. As such, the next steps will be first resizing the image and then reshaping the image.
+
+
+```{r}
+#Folder0
+
+#Resize
+for (i in 1:120) #here we take all the 120 images and resize them into 50*50 pixel. Now this should actually be as high as possible for better image classification, but to limit data size, we are resizing as 50*50
+{
+  mypic1[[i]] <- resize(mypic1[[i]], 50, 50)
+}
+
+#Now we will be reshaping the resized data into an array of length of 50 * 50 * 3, where 50*50 is pixels and 3 is colour depth
+#Reshape
+for (i in 1:120)
+{
+  mypic1[[i]] <- array_reshape(mypic1[[i]], c(50*50*3)) 
+}
+
+head(str(mypic1))
+
+#We do this to all folders:
+
+#Folder1
+
+
+#Resize
+for (i in 1:120)
+{
+  mypic2[[i]] <- resize(mypic2[[i]], 50, 50)
+}
+
+#Reshape
+for (i in 1:120)
+{
+  mypic2[[i]] <- array_reshape(mypic2[[i]], c(50*50*3)) 
+}
+
+head(str(mypic2))
+
+#Folder2
+
+
+#Resize
+for (i in 1:120)
+{
+  mypic3[[i]] <- resize(mypic3[[i]], 50, 50)
+}
+
+#Reshape
+for (i in 1:120)
+{
+  mypic3[[i]] <- array_reshape(mypic3[[i]], c(50*50*3)) 
+}
+
+head(str(mypic3))
+
+#Folder3
+
+
+#Resize
+for (i in 1:120)
+{
+  mypic4[[i]] <- resize(mypic4[[i]], 50, 50)
+}
+
+#Reshape
+for (i in 1:120)
+{
+  mypic4[[i]] <- array_reshape(mypic4[[i]], c(50*50*3)) 
+}
+
+head(str(mypic4))
+
+#Folder4
+
+
+#Resize
+for (i in 1:120)
+{
+  mypic5[[i]] <- resize(mypic5[[i]], 50, 50)
+}
+
+#Reshape
+for (i in 1:120)
+{
+  mypic5[[i]] <- array_reshape(mypic5[[i]], c(50*50*3)) 
+}
+
+head(str(mypic5))
+
+
+#Folder5
+
+#Resize
+for (i in 1:120)
+{
+  mypic6[[i]] <- resize(mypic6[[i]], 50, 50)
+}
+
+#Reshape
+for (i in 1:120)
+{
+  mypic6[[i]] <- array_reshape(mypic6[[i]], c(50*50*3)) 
+}
+
+head(str(mypic6))
+
+
+#Folder6
+
+
+#Resize
+for (i in 1:120)
+{
+  mypic7[[i]] <- resize(mypic7[[i]], 50, 50)
+}
+
+#Reshape
+for (i in 1:120)
+{
+  mypic7[[i]] <- array_reshape(mypic7[[i]], c(50*50*3)) 
+}
+
+head(str(mypic7))
+
+#Folder7
+
+#Resize
+for (i in 1:120)
+{
+  mypic8[[i]] <- resize(mypic8[[i]], 50, 50)
+}
+
+#Reshape
+for (i in 1:120)
+{
+  mypic8[[i]] <- array_reshape(mypic8[[i]], c(50*50*3)) 
+}
+
+head(str(mypic8))
+
+#Folder8
+
+#Resize
+for (i in 1:120)
+{
+  mypic9[[i]] <- resize(mypic9[[i]], 50, 50)
+}
+
+#Reshape
+for (i in 1:120)
+{
+  mypic9[[i]] <- array_reshape(mypic9[[i]], c(50*50*3)) 
+}
+
+head(str(mypic9))
+
+#Folder9
+
+#Resize
+for (i in 1:120)
+{
+  mypic10[[i]] <- resize(mypic10[[i]], 50, 50)
+}
+
+#Reshape
+for (i in 1:120)
+{
+  mypic10[[i]] <- array_reshape(mypic10[[i]], c(50*50*3)) 
+}
+
+head(str(mypic10))
+
+
+#Folder10
+
+
+#Resize
+for (i in 1:120)
+{
+  mypic11[[i]] <- resize(mypic11[[i]], 50, 50)
+}
+
+#Reshape
+for (i in 1:120)
+{
+  mypic11[[i]] <- array_reshape(mypic11[[i]], c(50*50*3)) 
+}
+
+head(str(mypic11))
+
+
+#Folder11
+
+#Resize
+for (i in 1:120)
+{
+  mypic12[[i]] <- resize(mypic12[[i]], 50, 50)
+}
+
+#Reshape
+for (i in 1:120)
+{
+  mypic12[[i]] <- array_reshape(mypic12[[i]], c(50*50*3)) 
+}
+
+head(str(mypic12))
+
+
+
+#Folder12
+
+#Resize
+for (i in 1:120)
+{
+  mypic13[[i]] <- resize(mypic13[[i]], 50, 50)
+}
+
+#Reshape
+for (i in 1:120)
+{
+  mypic13[[i]] <- array_reshape(mypic13[[i]], c(50*50*3)) 
+}
+
+head(str(mypic13))
+
+#Folder 13
+
+#Resize
+for (i in 1:120)
+{
+  mypic14[[i]] <- resize(mypic14[[i]], 50, 50)
+}
+
+#Reshape
+for (i in 1:120)
+{
+  mypic14[[i]] <- array_reshape(mypic14[[i]], c(50*50*3)) 
+}
+
+head(str(mypic14))
+
+
+#Folder 14
+
+#Resize
+for (i in 1:120)
+{
+  mypic15[[i]] <- resize(mypic15[[i]], 50, 50)
+}
+
+#Reshape
+for (i in 1:120)
+{
+  mypic15[[i]] <- array_reshape(mypic15[[i]], c(50*50*3)) 
+}
+
+head(str(mypic15))
+
+
+
+```
+
+
+Now we will join all the different files as a singe data frame:
+
+```{r}
+
+#We will first convert all the arrays to a dataframe:
+
+blouse <- t(as.data.frame(mypic1))
+cloak <- t(as.data.frame(mypic2))
+coat <- t(as.data.frame(mypic3))
+jacket <- t(as.data.frame(mypic4))
+longdress <- t(as.data.frame(mypic5))
+polo <- t(as.data.frame(mypic6))
+robe <- t(as.data.frame(mypic7))
+shirt <- t(as.data.frame(mypic8))
+shortdress <- t(as.data.frame(mypic9))
+suit <- t(as.data.frame(mypic10))
+sweater <- t(as.data.frame(mypic11))
+tee <- t(as.data.frame(mypic12))
+undergarment <- t(as.data.frame(mypic13))
+uniform <- t(as.data.frame(mypic14))
+waistcoat <- t(as.data.frame(mypic15))
+  
+
+#Now we will add another column, "Pred", that determines the class of each different folder. So the first folder will have a value 0, the second folder have 1, and so on. The final folder is 14 in our case
+
+a <- rep(0:14, each = 120) #this code generates numbers 0 to 14, each of the numbers 120 times together.
+a1 <- to_categorical(a) #this converts the previous column into a number of columns based on the number of classes, each column having either 0 or 1.
+b <- as.data.frame(a) #Making "a" a dataframe
+colnames(b) <- "Pred" #Renaming the data frame as Pred.
+
+#Now we will combine all the images into a single frame
+j <- rbind(blouse, cloak, coat, jacket, longdress, polo, robe, shirt, shortdress, suit, sweater, tee, undergarment, uniform, waistcoat)
+zz <- as.data.frame(j)
+g <- cbind(b,zz) #Combining the entire dataset with the predictor column.Now our target column is "Pred"
+```
+
+We will now divide our dataset into training and testing datasets:
+
+```{r}
+#we will consider the first 100 columns of each class as test, and the next 20 in train set
+
+train <- g[c(0:100,121:220,241:340,361:460,481:580, 601:700,721:820,841:940,961:1060,1081:1180, 1201:1300,1321:1420,1441:1540,1561:1660, 1681:1780),]
+train <- train[sample(nrow(train)),] #since there is a class progression, we use sample to randomize the rows
+test <- g[c(101:120, 221:240 ,341:360,461:480,581:600, 701:720,821:840,941:960, 1061:1080, 1181:1200,1301:1320,1421:1440,1541:1560,1661:1680,1781:1800),]
+
+```
+
+
+So we have seen how each folder looks like after preprocessing, as well as divided  the data into training and testing set. Now we will run the machine learning models.
+
+
+
+
+#Machine Learning:
+
+We will now develop our different machine learning algorithms:
+
+
+###1. Random Forest:
+
+Random Forest is an ensemble approach to classification based on decision trees.The main principle behind ensemble methods is that a group of "weak learners" can come together to form a "strong learner". This is basically random forest is all about.Random forest  is a combination of different decision trees, default being 500 treess, combines them together, and gives the output.
+
+Lets see how it can be used as an image classifier:
+
+```{r}
+
+train_rf <- train
+test_rf <- test
+train_rf$Pred <-factor(train_rf$Pred) #We factorize the Pred column for the output to be strictly among the existing values
+test_rf$Pred <-factor(test_rf$Pred)
+rf <- randomForest(Pred ~ .,data = train_rf) #using randomforest from randomforest package
+
+q1 <- predict(rf, train_rf)
+q2 <- predict(rf, test_rf)
+
+#Accuracy on train set
+confusionMatrix(q1, train_rf$Pred)
+
+#Accuracy of test set
+confusionMatrix(q2, test_rf$Pred)
+
+```
+
+We see train accuracy is 100%, and test accuracy is 30%. Accuracy can be improved by changing the depth of the algorithm.
+
+
+
+###2. Support Vector Machine:
+
+Support Vector Machine (SVM) is primarily a classier method that performs classification tasks by constructing hyperplanes in a multidimensional space that separates cases of different class labels. SVM basically maximises the margin of hyperplane
+
+```{r}
+
+model_svm <- svm(Pred ~ ., data=train_rf) #svm from e1071 library is used
+summary(model_svm)
+
+pred_svm1 <- predict(model_svm, train_rf)
+pred_svm2 <- predict(model_svm, test_rf)
+
+#Accuracy on train set
+confusionMatrix(pred_svm1,train_rf$Pred)
+
+#Accuracy on test set
+confusionMatrix(pred_svm2,test_rf$Pred)
+```
+
+We see train accuracy is 69.6% and test accuracy is 26%
+
+Improving model accuracy: SVM  model can be improved by defining radial, and finding the cost and gamma functions. The codes are commented here because it takes a long time to run.
+
+```{r}
+#svm_tune <- tune(svm, Pred ~ ., data = train_rf, kernel="radial", ranges=list(cost=10^(-1:2), gamma=c(.5,1,2)))
+#print(svm_tune)
+```
+
+I tested the code in a very small dataset and found cost function = 0.1, and gamma function to be 0.5. Using this in our code:
+
+```{r}
+
+modelsvm_after_tune <- svm(Pred ~ ., data=train_rf, kernel="radial", cost=0.1, gamma=0.5)
+summary(modelsvm_after_tune)
+
+pred_svm3 <- predict(modelsvm_after_tune, train_rf)
+pred_svm4 <- predict(modelsvm_after_tune, test_rf)
+
+confusionMatrix(pred_svm3,train_rf$Pred)
+confusionMatrix(pred_svm4,test_rf$Pred)
+```
+
+We see the train accuracy has increased to 100%.
+
+
+
+###Convolution Neural Network:
+
+CNNs are the category of Neural Network that are currently considered as the best algorithm for working on images. CNNs are pre-dominantly used for identifying faces, objects and traffic signs apart from powering vision in robots and self driving cars.
+
+Lets see how we develop the CNN model. We will be using the keras package in R. More about it can be read at:https://keras.rstudio.com/.
+
+It is also important to have keras installed in python, because the R package calls keras from python in the backend. Also, if you have multiple python notebook/consoles, the code will throw an error. Now lets get started:
+
+```{r}
+#We cannot directly feed the previous train data here. As such, we will be doing certain changes
+
+
+
+train_cnn <- zz[c(0:100,121:220,241:340,361:460,481:580, 601:700,721:820,841:940,961:1060,1081:1180, 1201:1300,1321:1420,1441:1540,1561:1660, 1681:1780),]
+test_cnn <- zz[c(101:120, 221:240 ,341:360,461:480,581:600, 701:720,821:840,941:960, 1061:1080, 1181:1200,1301:1320,1421:1440,1541:1560,1661:1680,1781:1800),]
+trainlabels_cnn <- a1[c(0:100,121:220,241:340,361:460,481:580, 601:700,721:820,841:940,961:1060,1081:1180, 1201:1300,1321:1420,1441:1540,1561:1660, 1681:1780),]
+testlabels_cnn <- a1[c(101:120, 221:240 ,341:360,461:480,581:600, 701:720,821:840,941:960, 1061:1080, 1181:1200,1301:1320,1421:1440,1541:1560,1661:1680,1781:1800),]
+train_t <- as.numeric(g[c(0:100,121:220,241:340,361:460,481:580, 601:700,721:820,841:940,961:1060,1081:1180, 1201:1300,1321:1420,1441:1540,1561:1660, 1681:1780),1])
+test_t <- as.numeric(g[c(101:120, 221:240 ,341:360,461:480,581:600, 701:720,821:840,941:960, 1061:1080, 1181:1200,1301:1320,1421:1440,1541:1560,1661:1680,1781:1800),1])
+trainlabelscnn2 <- as.matrix(trainlabels_cnn)
+testlabelscnn2 <- as.matrix(testlabels_cnn)
+library(keras)
+
+train_cnn2 <- as.matrix(train_cnn)
+test_cnn2 <- as.matrix(test_cnn)
+
+#We will use the pipe operator here, denoted by %>%. It  is used for chaining expressions together. Here LHS is first evaluated and putting the result of LHS in placeholder, RHS is calculated.
+
+
+#Keras has two types of model: sequential and models created with functional api. Sequential models are created using the keras_model_sequential() function and are composed of a set of linear stack of layers
+
+model <- keras_model_sequential()
+
+#defining hidden layers
+model %>%
+  layer_dense(units = 15, activation = 'relu', input_shape = c(7500)) %>%
+  layer_dense(units = 25, activation = 'relu') %>%
+  layer_dense(units = 15, activation = 'softmax')
+summary(model)
+
+#compile, i.e. configure a keras model for training.
+model %>%
+  compile(loss = 'categorical_crossentropy', #we use categorical for multiclass classifier. For only 2 classes, one can use binary_crossentropy
+  optimizer = 'adam', #Adam optimization algorithm is an extension to stochastic gradient descent that has recently seen broader adoption for deep learning applications in computer vision and natural language processing
+  metrics = 'accuracy')
+
+#Fit Mode: training the keras model
+  history <- model %>%
+    fit(train_cnn2, trainlabels_cnn, epochs = 30, batch_size = 32, validation_split = 0.2)
+
+  plot(history) 
+  
+#evaluate
+  #model %>%
+   # evaluate(train_cnn2, trainlabelscnn2)  
+  
+ model %>%
+    evaluate(test_cnn2, testlabelscnn2)
+  
+  # Prediction & confusion matrix - test data
+  prob <- model %>%
+    predict_proba(test_cnn2)
+  
+  pred1 <- model %>%
+    predict_classes(train_cnn2)
+  
+  pred2 <- model %>%
+    predict_classes(test_cnn2)
+  
+  table1 <- table(Predicted = pred1, Actual = train_t)
+  table1
+  
+  table2 <- table(Predicted = pred2, Actual = test_t)
+  table2
+```
+
+Thus from the table we see that accuracy for train set is (16+26+94+66+3+7)/1500 = 14.13%
+
+And the accuracy for test set is (3+2+16+12+2)/300 = 11.67%
+
+
+Now why CNN gives us the least accuracy? This is because CNN requires a very large amount of data, in tens of thousands of data to work as accurately as CNN is rumoured to have, and gets proportionately increased with no of class predictors.
+
+
+#Multiclass Nomial Logistic Regression: When it works and when it doesnt?
+
+Image classificaton can also be implemented using multinom package in r as below:
+
+```{r}
+#library(mlogit)
+#library(nnet)
+#library(caret)
+
+
+#model <- multinom(Pred ~ .,data = train, MaxNWts = 999999999999999999999999999)
+#p1 <- predict(model, train)
+#p2 <- predict(model, test)
+
+#confusionMatrix(p1, train$Pred)
+
+#confusionMatrix(p2, test$Pred)
+```
+
+
+However, you see the code is commented. This is because while the code works fine with very low data (in my system, its 100 total images), the runtime complexity for the function is very high to fit in, and throws out of memory exception. As such without high computing power this 
+
+Lets try to make this code run with only two classes and see how it fares:
+
+```{r}
+
+ne <- as.data.frame(rbind(blouse[1:25,], jacket[1:25,]))
+nd <- rep(0:1, each = 25)
+nb <- as.data.frame(nd)
+colnames(nb) <- "Pred"
+ft <- cbind(nb, ne)
+train_mul <- ft[c(0:20,26:45),]
+test_mul <- ft[c(21:25,46:50),]
+model_mul <- multinom(Pred ~ .,data = train_mul, MaxNWts = 999999999999999999999999999)
+p1 <- predict(model_mul, train_mul)
+p2 <- predict(model_mul, test_mul)
+
+confusionMatrix(p1, train_mul$Pred)
+
+confusionMatrix(p2, test_mul$Pred)
+
+```
+
+So we see that while the algorithm works, it gives a stiff  challenge on memory utilisation, and hence should be very rarely used for large image classification.
+
+
+Sources:
+
+1. http://blog.citizennet.com/blog/2012/11/10/random-forests-ensembles-and-performance-metrics
+2. http://www.statsoft.com/Textbook/Support-Vector-Machines
+3. https://towardsdatascience.com/support-vector-machines-a-brief-overview-37e018ae310f
+4. https://docs.hhvm.com/hack/operators/pipe-operator
+5. https://keras.rstudio.com/articles/about_keras_models.html
+
+
